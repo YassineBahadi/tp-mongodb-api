@@ -64,6 +64,230 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
+// =====================================
+// ROUTES DE L'API PRODUITS
+// =====================================
+
+// Route test
+app.get('/', (req, res) => {
+    res.send('🎉 API de gestion de produits fonctionnelle !');
+});
+
+// 1. GET TOUS LES PRODUITS (avec pagination, tri, filtrage)
+app.get('/api/products', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        
+        // Récupérer les paramètres de requête
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const category = req.query.category;
+        const minPrice = parseFloat(req.query.minPrice);
+        const maxPrice = parseFloat(req.query.maxPrice);
+        const search = req.query.search;
+        const sortBy = req.query.sortBy || '_id';
+        const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+        
+        // Construire le filtre
+        let filter = {};
+        
+        if (category) {
+            filter.category = category;
+        }
+        
+        if (!isNaN(minPrice) || !isNaN(maxPrice)) {
+            filter.price = {};
+            if (!isNaN(minPrice)) filter.price.$gte = minPrice;
+            if (!isNaN(maxPrice)) filter.price.$lte = maxPrice;
+        }
+        
+        if (search) {
+            filter.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+        
+        // Calculer le nombre de produits correspondants
+        const totalProducts = await collection.countDocuments(filter);
+        
+        // Récupérer les produits (avec pagination et tri)[citation:2]
+        const products = await collection.find(filter)
+            .sort({ [sortBy]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .toArray();
+        
+        // Réponse
+        res.json({
+            success: true,
+            page,
+            limit,
+            totalProducts,
+            totalPages: Math.ceil(totalProducts / limit),
+            products
+        });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 2. GET UN PRODUIT PAR ID
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        const product = await collection.findOne({ _id: new require('mongodb').ObjectId(req.params.id) });
+        
+        if (!product) {
+            return res.status(404).json({ success: false, message: 'Produit non trouvé' });
+        }
+        
+        res.json({ success: true, product });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 3. POST CRÉER UN NOUVEAU PRODUIT
+app.post('/api/products', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        
+        // Validation basique
+        if (!req.body.title || !req.body.price) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Le titre et le prix sont requis' 
+            });
+        }
+        
+        const newProduct = {
+            ...req.body,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        
+        const result = await collection.insertOne(newProduct);
+        
+        res.status(201).json({ 
+            success: true, 
+            message: 'Produit créé avec succès',
+            productId: result.insertedId 
+        });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 4. PUT METTRE À JOUR UN PRODUIT
+app.put('/api/products/:id', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        const productId = new require('mongodb').ObjectId(req.params.id);
+        
+        const updateData = {
+            ...req.body,
+            updatedAt: new Date()
+        };
+        
+        const result = await collection.updateOne(
+            { _id: productId },
+            { $set: updateData }
+        );
+        
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Produit non trouvé' 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Produit mis à jour avec succès',
+            modifiedCount: result.modifiedCount 
+        });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 5. DELETE SUPPRIMER UN PRODUIT
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        const productId = new require('mongodb').ObjectId(req.params.id);
+        
+        const result = await collection.deleteOne({ _id: productId });
+        
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Produit non trouvé' 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Produit supprimé avec succès' 
+        });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 6. GET STATISTIQUES DES PRODUITS (avec aggregation)
+app.get('/api/products/stats/summary', async (req, res) => {
+    try {
+        const collection = db.collection('products');
+        
+        // Pipeline d'aggregation
+        const pipeline = [
+            {
+                $group: {
+                    _id: null,
+                    totalProducts: { $sum: 1 },
+                    averagePrice: { $avg: '$price' },
+                    maxPrice: { $max: '$price' },
+                    minPrice: { $min: '$price' },
+                    totalStock: { $sum: '$stock' }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalProducts: 1,
+                    averagePrice: { $round: ['$averagePrice', 2] },
+                    maxPrice: 1,
+                    minPrice: 1,
+                    totalStock: 1
+                }
+            }
+        ];
+        
+        const stats = await collection.aggregate(pipeline).toArray();
+        
+        res.json({ 
+            success: true, 
+            stats: stats[0] || {} 
+        });
+        
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 9. DÉMARRAGE DU SERVEUR
 app.listen(port, async () => {
     console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
