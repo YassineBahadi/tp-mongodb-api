@@ -250,6 +250,40 @@ async function getProductStats(req, res) {
             { $sort: { _id: 1 } }
         ];
 
+        // ========== EXERCICE 6.2 : MEILLEURS PRODUITS PAR NOTATION ==========
+const bestRatedPipeline = [
+    // $match - Prix > 500 et rating existant
+    {
+        $match: {
+            price: { $gt: 500 },
+            rating: { $exists: true, $ne: null }
+        }
+    },
+    
+    // $sort - Par rating décroissant
+    {
+        $sort: { rating: -1 }
+    },
+    
+    // $limit - 5 premiers
+    {
+        $limit: 5
+    },
+    
+    // $project - Champs demandés
+    {
+        $project: {
+            _id: 0,
+            title: 1,
+            price: 1,
+            rating: 1,
+            category: 1,
+            brand: 1
+        }
+    }
+];
+
+
         // ========== EXERCICE 6.5 : TENDANCE DES PRIX PAR CATÉGORIE ==========
         const priceTrendPipeline = [
             {
@@ -326,6 +360,7 @@ async function getProductStats(req, res) {
             productsCollection.aggregate(topBrandsPipeline).toArray(),
             productsCollection.aggregate(ratingAnalysisPipeline).toArray(),
             productsCollection.aggregate(priceTrendPipeline).toArray(),
+            productsCollection.aggregate(bestRatedPipeline).toArray(),
             
             // Statistiques globales
             productsCollection.aggregate([
@@ -414,6 +449,17 @@ async function getProductStats(req, res) {
                     ratings: ratingAnalysis,
                     overallRating: overallStats[0]?.avgRating || 0
                 },
+
+                bestRatedAnalysis: {
+    description: "🏆 Top 5 des produits les mieux notés (prix > 500€) - Exercice 6.2",
+    products: bestRatedProducts,
+    pipeline: [
+        "$match: price > 500 et rating existant",
+        "$sort: rating décroissant",
+        "$limit: 5 résultats",
+        "$project: title, price, rating"
+    ]
+},
 
                 // Exercice 6.5 - Tendance des prix par catégorie
                 priceTrends: {
@@ -745,9 +791,320 @@ async function testAggregationPipeline(req, res) {
     }
 }
 
+async function getBestRatedProducts(req, res) {
+    try {
+        const db = getDB();
+        const productsCollection = db.collection('products');
+
+        // Récupérer les paramètres de la requête
+        const minPrice = parseFloat(req.query.minPrice) || 500;
+        const limit = parseInt(req.query.limit) || 5;
+        const sortOrder = req.query.order === 'asc' ? 1 : -1; // desc par défaut
+
+        console.log(`🔍 Recherche des meilleurs produits: prix > ${minPrice}€, limit: ${limit}`);
+
+        // ========== PIPELINE EXERCICE 6.2 ==========
+        const pipeline = [
+            // Étape 1: $match - Filtrer les produits avec price > minPrice
+            {
+                $match: {
+                    price: { $gt: minPrice },           // Prix supérieur à minPrice
+                    rating: { $exists: true, $ne: null } // Rating doit exister
+                }
+            },
+            
+            // Étape 2: $sort - Trier par rating en ordre décroissant (ou croissant)
+            {
+                $sort: { 
+                    rating: sortOrder                   // -1 = décroissant, 1 = croissant
+                }
+            },
+            
+            // Étape 3: $limit - Limiter aux N premiers résultats
+            {
+                $limit: limit
+            },
+            
+            // Étape 4: $project - Sélectionner uniquement les champs nécessaires
+            {
+                $project: {
+                    _id: 0,                            // Exclure l'ID
+                    title: 1,                          // Inclure le titre
+                    price: 1,                          // Inclure le prix
+                    rating: 1,                         // Inclure le rating
+                    
+                    // Informations supplémentaires utiles
+                    category: 1,
+                    brand: 1,
+                    stock: 1,
+                    thumbnail: 1,
+                    
+                    // Calculer le rapport qualité-prix
+                    valueScore: {
+                        $round: [
+                            { $divide: ["$rating", "$price"] },
+                            4
+                        ]
+                    }
+                }
+            }
+        ];
+
+        // Exécuter le pipeline
+        const bestProducts = await productsCollection.aggregate(pipeline).toArray();
+
+        // Calculer des statistiques supplémentaires
+        const stats = {
+            totalFound: bestProducts.length,
+            averageRating: bestProducts.length > 0 
+                ? (bestProducts.reduce((sum, p) => sum + p.rating, 0) / bestProducts.length).toFixed(2)
+                : 0,
+            averagePrice: bestProducts.length > 0 
+                ? (bestProducts.reduce((sum, p) => sum + p.price, 0) / bestProducts.length).toFixed(2)
+                : 0,
+            priceRange: bestProducts.length > 0 
+                ? {
+                    min: Math.min(...bestProducts.map(p => p.price)),
+                    max: Math.max(...bestProducts.map(p => p.price))
+                }
+                : null
+        };
+
+        // ========== PIPELINE POUR LES PIRE PRODUITS (BONUS) ==========
+        let worstProducts = [];
+        if (req.query.includeWorst === 'true') {
+            const worstPipeline = [
+                {
+                    $match: {
+                        price: { $gt: minPrice },
+                        rating: { $exists: true, $ne: null }
+                    }
+                },
+                {
+                    $sort: { 
+                        rating: 1  // Ordre croissant pour les pires
+                    }
+                },
+                {
+                    $limit: limit
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        title: 1,
+                        price: 1,
+                        rating: 1,
+                        category: 1,
+                        brand: 1
+                    }
+                }
+            ];
+
+            worstProducts = await productsCollection.aggregate(worstPipeline).toArray();
+        }
+
+        // ========== PRÉPARATION DE LA RÉPONSE ==========
+        const response = {
+            success: true,
+            message: bestProducts.length > 0 
+                ? `${bestProducts.length} meilleurs produits trouvés`
+                : 'Aucun produit ne correspond aux critères',
+            
+            exercise: '6.2 - Recherche des Meilleurs Produits par Notation',
+            description: 'Trouver les produits les mieux notés avec un prix supérieur au seuil défini',
+            
+            parameters: {
+                minPrice: minPrice,
+                limit: limit,
+                sortOrder: sortOrder === -1 ? 'descendant (meilleurs)' : 'ascendant (pires)',
+                ratingRequired: true
+            },
+            
+            pipelineStages: [
+                {
+                    stage: 1,
+                    operator: '$match',
+                    description: `Filtrer les produits avec price > ${minPrice} et rating non null`,
+                    query: { price: { $gt: minPrice }, rating: { $exists: true } }
+                },
+                {
+                    stage: 2,
+                    operator: '$sort',
+                    description: `Trier par rating (${sortOrder === -1 ? 'descendant' : 'ascendant'})`,
+                    sort: { rating: sortOrder }
+                },
+                {
+                    stage: 3,
+                    operator: '$limit',
+                    description: `Limiter à ${limit} résultats`
+                },
+                {
+                    stage: 4,
+                    operator: '$project',
+                    description: 'Sélectionner les champs title, price, rating',
+                    fields: ['title', 'price', 'rating', 'category', 'brand', 'valueScore']
+                }
+            ],
+            
+            data: {
+                bestProducts: bestProducts,
+                statistics: stats,
+                
+                // Données supplémentaires si demandées
+                ...(worstProducts.length > 0 && {
+                    worstProducts: worstProducts,
+                    comparison: {
+                        bestAverageRating: stats.averageRating,
+                        worstAverageRating: worstProducts.length > 0 
+                            ? (worstProducts.reduce((sum, p) => sum + p.rating, 0) / worstProducts.length).toFixed(2)
+                            : 0
+                    }
+                })
+            },
+            
+            insights: bestProducts.length > 0 ? {
+                bestProduct: bestProducts[0],
+                bestValueProduct: [...bestProducts].sort((a, b) => b.valueScore - a.valueScore)[0],
+                categories: [...new Set(bestProducts.map(p => p.category))],
+                brands: [...new Set(bestProducts.map(p => p.brand))]
+            } : null,
+            
+            metadata: {
+                timestamp: new Date().toISOString(),
+                collection: 'products',
+                totalProducts: await productsCollection.countDocuments({
+                    price: { $gt: minPrice },
+                    rating: { $exists: true }
+                })
+            }
+        };
+
+        console.log(`✅ ${bestProducts.length} meilleurs produits trouvés (prix > ${minPrice}€)`);
+        
+        if (bestProducts.length > 0) {
+            console.log(`🏆 Meilleur produit: ${bestProducts[0].title} (${bestProducts[0].rating}⭐)`);
+        }
+
+        res.json(response);
+
+    } catch (error) {
+        console.error('❌ Erreur dans getBestRatedProducts:', error);
+        
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la recherche des meilleurs produits',
+            error: process.env.NODE_ENV === 'development' ? {
+                message: error.message,
+                operation: 'aggregation'
+            } : undefined,
+            exercise: '6.2',
+            timestamp: new Date().toISOString()
+        });
+    }
+}
+
+/**
+ * 🎯 VERSION ALTERNATIVE AVEC PLUS D'OPTIONS
+ * GET /api/products/stats/top-rated
+ */
+async function getTopRatedProducts(req, res) {
+    try {
+        const db = getDB();
+        const productsCollection = db.collection('products');
+
+        // Paramètres avancés
+        const {
+            minPrice = 500,
+            maxPrice,
+            minRating = 4,
+            category,
+            brand,
+            limit = 5,
+            sortBy = 'rating',
+            includeDetails = false
+        } = req.query;
+
+        console.log('🎯 Recherche de produits top-rated avec filtres avancés');
+
+        // Construction du filtre $match
+        const matchFilter = {
+            rating: { $gte: parseFloat(minRating) }
+        };
+
+        if (minPrice) matchFilter.price = { $gt: parseFloat(minPrice) };
+        if (maxPrice) {
+            matchFilter.price = matchFilter.price || {};
+            matchFilter.price.$lt = parseFloat(maxPrice);
+        }
+        if (category) matchFilter.category = category;
+        if (brand) matchFilter.brand = brand;
+
+        // Pipeline pour les produits premium
+        const premiumPipeline = [
+            { $match: matchFilter },
+            { $sort: { [sortBy]: -1 } },
+            { $limit: parseInt(limit) },
+            {
+                $project: {
+                    _id: 0,
+                    title: 1,
+                    price: 1,
+                    rating: 1,
+                    ...(includeDetails === 'true' && {
+                        description: 1,
+                        category: 1,
+                        brand: 1,
+                        stock: 1,
+                        thumbnail: 1,
+                        valueRatio: { $divide: ["$rating", "$price"] }
+                    })
+                }
+            }
+        ];
+
+        const topProducts = await productsCollection.aggregate(premiumPipeline).toArray();
+
+        // Pipeline pour les statistiques
+        const statsPipeline = [
+            { $match: matchFilter },
+            {
+                $group: {
+                    _id: null,
+                    count: { $sum: 1 },
+                    avgPrice: { $avg: "$price" },
+                    avgRating: { $avg: "$rating" },
+                    maxRating: { $max: "$rating" }
+                }
+            }
+        ];
+
+        const statsResult = await productsCollection.aggregate(statsPipeline).toArray();
+        const stats = statsResult[0] || { count: 0, avgPrice: 0, avgRating: 0 };
+
+        res.json({
+            success: true,
+            data: {
+                products: topProducts,
+                filtersApplied: matchFilter,
+                statistics: {
+                    totalMatchingProducts: stats.count,
+                    averagePrice: parseFloat(stats.avgPrice).toFixed(2),
+                    averageRating: parseFloat(stats.avgRating).toFixed(2),
+                    maxRating: stats.maxRating
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Erreur dans getTopRatedProducts:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur' });
+    }
+}
 // Exporter les fonctions
 module.exports = {
     getProductStats,
     getCategoryStats,
+    getBestRatedProducts,   
+    getTopRatedProducts,     
     testAggregationPipeline
 };

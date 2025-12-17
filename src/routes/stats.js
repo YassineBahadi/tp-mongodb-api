@@ -207,4 +207,110 @@ router.get('/docs', (req, res) => {
     });
 });
 
+// Ajouter ces routes dans src/routes/stats.js
+
+/**
+ * @swagger
+ * /api/products/stats/best-rated:
+ *   get:
+ *     summary: Exercice 6.2 - Meilleurs produits par notation
+ *     tags: [Statistiques]
+ *     description: |
+ *       **Exercice 6.2: Recherche des Meilleurs Produits par Notation**
+ *       
+ *       Pipeline MongoDB:
+ *       1. $match - Filtrer les produits avec price > 500 et rating existant
+ *       2. $sort - Trier par rating en ordre décroissant
+ *       3. $limit - Limiter aux 5 premiers résultats
+ *       4. $project - Sélectionner les champs title, price, rating
+ *       
+ *       Retourne les 5 produits les mieux notés avec un prix > 500€
+ *     parameters:
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *           default: 500
+ *         description: Prix minimum des produits
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *         description: Nombre de produits à retourner
+ *       - in: query
+ *         name: order
+ *         schema:
+ *           type: string
+ *           default: desc
+ *           enum: [asc, desc]
+ *         description: Ordre de tri (desc pour les meilleurs, asc pour les pires)
+ *       - in: query
+ *         name: includeWorst
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Inclure aussi les pires produits
+ *     responses:
+ *       200:
+ *         description: Liste des meilleurs produits
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 exercise:
+ *                   type: string
+ *                 pipelineStages:
+ *                   type: array
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     bestProducts:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           title:
+ *                             type: string
+ *                           price:
+ *                             type: number
+ *                           rating:
+ *                             type: number
+ *       500:
+ *         description: Erreur serveur
+ */
+router.get('/best-rated', statsController.getBestRatedProducts);
+
+/**
+ * @swagger
+ * /api/products/stats/top-rated:
+ *   get:
+ *     summary: Produits les mieux notés (version avancée)
+ *     tags: [Statistiques]
+ *     parameters:
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *         description: Prix minimum
+ *       - in: query
+ *         name: minRating
+ *         schema:
+ *           type: number
+ *           default: 4
+ *         description: Rating minimum
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filtrer par catégorie
+ *     responses:
+ *       200:
+ *         description: Produits top-rated
+ */
+router.get('/top-rated', statsController.getTopRatedProducts);
+
 module.exports = router;
