@@ -3,6 +3,8 @@
 const express = require('express');
 const router = express.Router();
 const productsController = require('../controllers/productsController');
+const statsController = require('../controllers/statsController'); // <-- Ajouter cette ligne
+
 
 // ========== DOCUMENTATION DES ROUTES ==========
 /**
@@ -414,5 +416,31 @@ router.get('/examples/filters', (req, res) => {
         orderOptions: ["asc", "desc"]
     });
 });
+
+// ========== NOUVELLES ROUTES DE STATISTIQUES ==========
+
+/**
+ * @swagger
+ * /api/products/stats/summary:
+ *   get:
+ *     summary: Statistiques sommaires des produits (existant)
+ *     tags: [Produits]
+ *     responses:
+ *       200:
+ *         description: Statistiques récupérées
+ */
+router.get('/stats/summary', productsController.getProductStats); // Existant
+
+/**
+ * @swagger
+ * /api/products/stats/categories:
+ *   get:
+ *     summary: Statistiques détaillées par catégorie
+ *     tags: [Produits]
+ *     responses:
+ *       200:
+ *         description: Statistiques par catégorie récupérées
+ */
+router.get('/stats/categories', statsController.getCategoryStats); // <-- Nouveau
 
 module.exports = router;

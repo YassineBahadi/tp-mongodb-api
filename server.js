@@ -4,6 +4,8 @@ const express = require('express');
 const dotenv = require('dotenv');
 const { connectDB } = require('./src/config/database');
 const productRoutes = require('./src/routes/products');
+const statsRoutes = require('./src/routes/stats'); // <-- Ajouter cette ligne
+
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -27,6 +29,7 @@ connectDB().catch(console.error);
 
 // Routes API
 app.use('/api/products', productRoutes);
+app.use('/api/products/stats', statsRoutes); 
 
 // Route de test principale
 app.get('/', (req, res) => {
