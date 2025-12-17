@@ -41,20 +41,20 @@ app.get('/', (req, res) => {
 });
 
 // 7. EXEMPLE DE ROUTE POUR RÉCUPÉRER DES PRODUITS
-app.get('/api/produits', async (req, res) => {
+app.get('/api/products', async (req, res) => {
     try {
-        const produits = await db.collection('products').find({}).toArray();
-        res.json(produits);
+        const products = await db.collection('products').find({}).toArray();
+        res.json(products);
     } catch (error) {
         res.status(500).json({ error: 'Erreur lors de la récupération des produits' });
     }
 });
 
 // 8. EXEMPLE DE ROUTE POUR AJOUTER UN PRODUIT
-app.post('/api/produits', async (req, res) => {
+app.post('/api/products', async (req, res) => {
     try {
         const nouveauProduit = req.body;
-        const result = await db.collection('produits').insertOne(nouveauProduit);
+        const result = await db.collection('products').insertOne(nouveauProduit);
         res.status(201).json({ 
             message: 'Produit ajouté avec succès', 
             id: result.insertedId 
