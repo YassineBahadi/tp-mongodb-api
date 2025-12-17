@@ -18,7 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 app.use((req, res, next) => {
-    console.log(`📨 ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
+    console.log(` ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
     next();
 });
 
@@ -29,7 +29,7 @@ app.use('/api/products/stats', statsRoutes);
 
 app.get('/', (req, res) => {
     res.json({ 
-        message: '🚀 API de gestion de produits avec MongoDB Compass',
+        message: ' API de gestion de produits avec MongoDB Compass',
         version: '1.0.0',
         database: 'produitsDB',
         collections: ['products'],
@@ -171,7 +171,7 @@ app.get('/api/mongodb-check', async (req, res) => {
 app.use((req, res) => {
     res.status(404).json({ 
         success: false, 
-        message: '🔍 Route non trouvée',
+        message: ' Route non trouvée',
         requestedPath: req.originalUrl,
         availableRoutes: [
             'GET /',
@@ -190,7 +190,7 @@ app.use((req, res) => {
 
 // Gestion des erreurs globales
 app.use((err, req, res, next) => {
-    console.error('❌ Erreur serveur:', {
+    console.error(' Erreur serveur:', {
         message: err.message,
         stack: err.stack,
         path: req.originalUrl,
@@ -200,7 +200,7 @@ app.use((err, req, res, next) => {
     
     res.status(500).json({ 
         success: false, 
-        message: '🚨 Erreur interne du serveur',
+        message: ' Erreur interne du serveur',
         error: process.env.NODE_ENV === 'development' ? {
             message: err.message,
             stack: err.stack
@@ -212,21 +212,21 @@ app.use((err, req, res, next) => {
 // Démarrer le serveur
 const server = app.listen(port, async () => {
     console.log('='.repeat(50));
-    console.log('🚀 SERVEUR API PRODUITS AVEC MONGODB COMPASS');
+    console.log(' SERVEUR API PRODUITS AVEC MONGODB COMPASS');
     console.log('='.repeat(50));
-    console.log(`✅ Serveur démarré sur http://localhost:${port}`);
-    console.log(`📡 Port: ${port}`);
-    console.log(`🗄️  Base de données: produitsDB`);
-    console.log(`🔌 Chaîne de connexion: ${process.env.DB_STRING}`);
+    console.log(` Serveur démarré sur http://localhost:${port}`);
+    console.log(` Port: ${port}`);
+    console.log(`  Base de données: produitsDB`);
+    console.log(` Chaîne de connexion: ${process.env.DB_STRING}`);
     console.log('='.repeat(50));
-    console.log('📋 ENDPOINTS DISPONIBLES:');
-    console.log(`   🌐 Accueil: http://localhost:${port}`);
-    console.log(`   📊 Santé: http://localhost:${port}/health`);
-    console.log(`   📖 Documentation: http://localhost:${port}/api/docs`);
-    console.log(`   🛒 Produits: http://localhost:${port}/api/products`);
-    console.log(`   🔍 Vérif MongoDB: http://localhost:${port}/api/mongodb-check`);
+    console.log(' ENDPOINTS DISPONIBLES:');
+    console.log(`    Accueil: http://localhost:${port}`);
+    console.log(`    Santé: http://localhost:${port}/health`);
+    console.log(`    Documentation: http://localhost:${port}/api/docs`);
+    console.log(`    Produits: http://localhost:${port}/api/products`);
+    console.log(`   Vérif MongoDB: http://localhost:${port}/api/mongodb-check`);
     console.log('='.repeat(50));
-    console.log('🎯 POUR MONGODB COMPASS:');
+    console.log(' POUR MONGODB COMPASS:');
     console.log(`   1. Ouvrir MongoDB Compass`);
     console.log(`   2. Coller: ${process.env.DB_STRING}`);
     console.log(`   3. Se connecter`);
@@ -237,9 +237,9 @@ const server = app.listen(port, async () => {
 
 // Gestion de la fermeture propre
 process.on('SIGINT', () => {
-    console.log('\n⚠️  Fermeture du serveur...');
+    console.log('\n  Fermeture du serveur...');
     server.close(() => {
-        console.log('✅ Serveur arrêté proprement');
+        console.log(' Serveur arrêté proprement');
         process.exit(0);
     });
 });
