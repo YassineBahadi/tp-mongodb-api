@@ -313,4 +313,71 @@ router.get('/best-rated', statsController.getBestRatedProducts);
  */
 router.get('/top-rated', statsController.getTopRatedProducts);
 
+
+/**
+ * @swagger
+ * /api/products/stats/brand-analysis:
+ *   get:
+ *     summary: Exercice 6.3 - Analyse complète par marque
+ *     tags: [Statistiques]
+ *     description: |
+ *       **Exercice 6.3: Décomposition par Marque et Prix Total**
+ *       
+ *       Pipeline MongoDB:
+ *       1. $match - Filtrer les produits avec marque définie
+ *       2. $group - Regrouper par marque et calculer:
+ *          - totalStock: { $sum: "$stock" }
+ *          - totalValue: { $sum: { $multiply: ["$price", "$stock"] } }
+ *          - productCount: { $sum: 1 }
+ *          - averagePrice: { $avg: "$price" }
+ *       3. $sort - Trier par valeur totale décroissante
+ *       4. $project - Formater et renommer les champs
+ *       
+ *       Inclut également une démonstration de $unwind avec les tags
+ *     responses:
+ *       200:
+ *         description: Analyse des marques complète
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 exercise:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     brandAnalysis:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           brand:
+ *                             type: string
+ *                           totalStock:
+ *                             type: number
+ *                           totalValue:
+ *                             type: number
+ *                           productCount:
+ *                             type: number
+ *       500:
+ *         description: Erreur serveur
+ */
+router.get('/brand-analysis', statsController.getBrandAnalysis);
+
+/**
+ * @swagger
+ * /api/products/stats/brands/simple:
+ *   get:
+ *     summary: Exercice 6.3 exact - Analyse simple par marque
+ *     tags: [Statistiques]
+ *     description: Version simplifiée de l'exercice 6.3
+ *     responses:
+ *       200:
+ *         description: Analyse simple des marques
+ */
+router.get('/brands/simple', statsController.getBrandSimpleAnalysis);
+
 module.exports = router;

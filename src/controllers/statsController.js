@@ -137,6 +137,42 @@ async function getProductStats(req, res) {
             }
         ];
 
+        const brandAnalysisPipeline = [
+    {
+        $match: {
+            brand: { $exists: true, $ne: "" }
+        }
+    },
+    {
+        $group: {
+            _id: "$brand",
+            totalStock: { $sum: "$stock" },
+            totalValue: { 
+                $sum: { $multiply: ["$price", "$stock"] }
+            },
+            productCount: { $sum: 1 },
+            averagePrice: { $avg: "$price" }
+        }
+    },
+    {
+        $sort: { totalValue: -1 }
+    },
+    {
+        $limit: 10
+    },
+    {
+        $project: {
+            _id: 0,
+            brand: "$_id",
+            totalStock: 1,
+            totalValue: { $round: ["$totalValue", 2] },
+            productCount: 1,
+            averagePrice: { $round: ["$averagePrice", 2] }
+        }
+    }
+];
+
+
         // ========== EXERCICE 6.2 : DISTRIBUTION DES PRIX PAR TRANCHE ==========
         const priceDistributionPipeline = [
             {
@@ -353,7 +389,9 @@ const bestRatedPipeline = [
             topBrands,
             ratingAnalysis,
             priceTrends,
-            overallStats
+            overallStats,
+            bestRatedProducts,
+            brandAnalysis
         ] = await Promise.all([
             productsCollection.aggregate(categoryStatsPipeline).toArray(),
             productsCollection.aggregate(priceDistributionPipeline).toArray(),
@@ -361,6 +399,9 @@ const bestRatedPipeline = [
             productsCollection.aggregate(ratingAnalysisPipeline).toArray(),
             productsCollection.aggregate(priceTrendPipeline).toArray(),
             productsCollection.aggregate(bestRatedPipeline).toArray(),
+            productsCollection.aggregate(brandAnalysisPipeline).toArray(),
+
+            
             
             // Statistiques globales
             productsCollection.aggregate([
@@ -435,6 +476,19 @@ const bestRatedPipeline = [
                         premiumProducts: priceDistribution.filter(p => p.priceRange.includes("1000-2000") || p.priceRange.includes("2000-5000") || p.priceRange.includes("5000-10000") || p.priceRange.includes("10000€+")).reduce((sum, p) => sum + p.count, 0)
                     }
                 },
+
+                brandAnalysis: {
+    description: "🏭 Top 10 des marques par valeur de stock - Exercice 6.3",
+    brands: brandAnalysis,
+    totalStockValue: brandAnalysis.reduce((sum, brand) => sum + brand.totalValue, 0),
+    pipeline: [
+        "$match: produits avec marque définie",
+        "$group: regrouper par brand avec $sum et $multiply",
+        "$sort: par totalValue décroissant",
+        "$limit: 10 marques",
+        "$project: formater les résultats"
+    ]
+},
 
                 // Exercice 6.3 - Top 10 des marques
                 topBrands: {
@@ -1100,11 +1154,491 @@ async function getTopRatedProducts(req, res) {
         res.status(500).json({ success: false, message: 'Erreur serveur' });
     }
 }
+
+
+// Ajouter cette fonction dans src/controllers/statsController.js
+
+/**
+ * 🏭 EXERCICE 6.3 : ANALYSE PAR MARQUE - STOCK ET VALEUR TOTALE
+ * GET /api/products/stats/brand-analysis
+ * 
+ * Objectif : Pour chaque marque, calculer :
+ * - Le stock total (somme des stocks)
+ * - La valeur totale du stock (somme de price * stock)
+ * - Le nombre de produits
+ * - Le prix moyen
+ */
+async function getBrandAnalysis(req, res) {
+    try {
+        const db = getDB();
+        const productsCollection = db.collection('products');
+
+        console.log('🏭 Analyse des marques - Exercice 6.3');
+
+        // ========== PIPELINE EXERCICE 6.3 - VERSION BASE ==========
+        const basicPipeline = [
+            // Étape 1: Filtrer les produits avec une marque définie
+            {
+                $match: {
+                    brand: { $exists: true, $ne: "" },
+                    stock: { $exists: true },
+                    price: { $exists: true }
+                }
+            },
+            
+            // Étape 2: Regrouper par marque (brand)
+            {
+                $group: {
+                    _id: "$brand",  // Regroupement par marque
+                    
+                    // Accumulateur 1: Somme du stock
+                    totalStock: { $sum: "$stock" },
+                    
+                    // Accumulateur 2: Valeur totale (price * stock)
+                    totalValue: { 
+                        $sum: { 
+                            $multiply: ["$price", "$stock"] 
+                        } 
+                    },
+                    
+                    // Statistiques supplémentaires
+                    productCount: { $sum: 1 },               // Nombre de produits
+                    averagePrice: { $avg: "$price" },        // Prix moyen
+                    averageRating: { $avg: "$rating" },      // Rating moyen
+                    maxPrice: { $max: "$price" },           // Prix max
+                    minPrice: { $min: "$price" }            // Prix min
+                }
+            },
+            
+            // Étape 3: Trier par valeur totale décroissante
+            {
+                $sort: { totalValue: -1 }
+            },
+            
+            // Étape 4: Formater la réponse
+            {
+                $project: {
+                    _id: 0,
+                    brand: "$_id",                         // Renommer _id en brand
+                    
+                    // Métriques principales
+                    totalStock: 1,
+                    totalValue: { $round: ["$totalValue", 2] },
+                    productCount: 1,
+                    
+                    // Statistiques de prix
+                    averagePrice: { $round: ["$averagePrice", 2] },
+                    averageRating: { $round: ["$averageRating", 2] },
+                    priceRange: {
+                        min: { $round: ["$minPrice", 2] },
+                        max: { $round: ["$maxPrice", 2] }
+                    },
+                    
+                    // Métriques dérivées
+                    averageStockPerProduct: {
+                        $round: [
+                            { $divide: ["$totalStock", "$productCount"] },
+                            2
+                        ]
+                    },
+                    averageValuePerProduct: {
+                        $round: [
+                            { $divide: ["$totalValue", "$productCount"] },
+                            2
+                        ]
+                    }
+                }
+            }
+        ];
+
+        // ========== PIPELINE AVANCÉ - AVEC $UNWIND (SIMULATION) ==========
+        // Pour démontrer $unwind, on simule avec des tags
+        const advancedPipeline = [
+            // Étape 1: Filtrer les produits avec tags
+            {
+                $match: {
+                    tags: { $exists: true, $ne: [] },
+                    brand: { $exists: true, $ne: "" }
+                }
+            },
+            
+            // Étape 2: $unwind - Décomposer le tableau tags
+            {
+                $unwind: "$tags"
+            },
+            
+            // Étape 3: Regrouper par marque ET tag
+            {
+                $group: {
+                    _id: {
+                        brand: "$brand",
+                        tag: "$tags"
+                    },
+                    productCount: { $sum: 1 },
+                    totalStock: { $sum: "$stock" },
+                    totalValue: { 
+                        $sum: { $multiply: ["$price", "$stock"] }
+                    }
+                }
+            },
+            
+            // Étape 4: Trier
+            {
+                $sort: { "_id.brand": 1, totalValue: -1 }
+            },
+            
+            // Étape 5: Projection finale
+            {
+                $project: {
+                    _id: 0,
+                    brand: "$_id.brand",
+                    tag: "$_id.tag",
+                    productCount: 1,
+                    totalStock: 1,
+                    totalValue: { $round: ["$totalValue", 2] }
+                }
+            },
+            { $limit: 20 }
+        ];
+
+        // ========== PIPELINE POUR LE MARKET SHARE ==========
+        const marketSharePipeline = [
+            {
+                $match: {
+                    brand: { $exists: true, $ne: "" }
+                }
+            },
+            {
+                $group: {
+                    _id: "$brand",
+                    totalValue: { $sum: { $multiply: ["$price", "$stock"] } }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalMarketValue: { $sum: "$totalValue" },
+                    brands: { $push: { brand: "$_id", brandValue: "$totalValue" } }
+                }
+            },
+            {
+                $unwind: "$brands"
+            },
+            {
+                $project: {
+                    _id: 0,
+                    brand: "$brands.brand",
+                    brandValue: { $round: ["$brands.brandValue", 2] },
+                    marketShare: {
+                        $round: [
+                            { 
+                                $multiply: [
+                                    { $divide: ["$brands.brandValue", "$totalMarketValue"] },
+                                    100
+                                ]
+                            },
+                            2
+                        ]
+                    },
+                    totalMarketValue: { $round: ["$totalMarketValue", 2] }
+                }
+            },
+            { $sort: { marketShare: -1 } },
+            { $limit: 10 }
+        ];
+
+        // ========== EXÉCUTION DES PIPELINES ==========
+        console.log('⚡ Exécution des pipelines d\'analyse par marque...');
+        
+        const [brandStats, tagAnalysis, marketShare] = await Promise.all([
+            productsCollection.aggregate(basicPipeline).toArray(),
+            productsCollection.aggregate(advancedPipeline).toArray(),
+            productsCollection.aggregate(marketSharePipeline).toArray()
+        ]);
+
+        // ========== CALCUL DES STATISTIQUES GLOBALES ==========
+        const globalStats = {
+            totalBrands: brandStats.length,
+            totalStockAllBrands: brandStats.reduce((sum, brand) => sum + brand.totalStock, 0),
+            totalValueAllBrands: brandStats.reduce((sum, brand) => sum + brand.totalValue, 0),
+            topBrandByValue: brandStats[0] || null,
+            topBrandByStock: [...brandStats].sort((a, b) => b.totalStock - a.totalStock)[0] || null,
+            averageProductsPerBrand: brandStats.length > 0 
+                ? (brandStats.reduce((sum, brand) => sum + brand.productCount, 0) / brandStats.length).toFixed(2)
+                : 0
+        };
+
+        // ========== ANALYSE DE PERFORMANCE ==========
+        const performanceAnalysis = brandStats.map(brand => ({
+            brand: brand.brand,
+            productCount: brand.productCount,
+            totalValue: brand.totalValue,
+            efficiency: brand.totalStock > 0 
+                ? (brand.totalValue / brand.totalStock).toFixed(2)  // Valeur par unité de stock
+                : 0,
+            inventoryTurnover: brand.averageStockPerProduct > 0 
+                ? (brand.totalValue / (brand.averageStockPerProduct * brand.productCount)).toFixed(2)
+                : 0
+        })).sort((a, b) => b.efficiency - a.efficiency);
+
+        // ========== PRÉPARATION DE LA RÉPONSE ==========
+        const response = {
+            success: true,
+            message: `Analyse de ${brandStats.length} marques effectuée avec succès`,
+            
+            exercise: '6.3 - Décomposition par Marque et Prix Total',
+            description: 'Analyse des marques avec calcul du stock total et de la valeur totale du stock',
+            
+            pipelineExplanation: {
+                basicPipeline: [
+                    {
+                        stage: 1,
+                        operator: '$match',
+                        description: 'Filtrer les produits avec marque, stock et prix définis'
+                    },
+                    {
+                        stage: 2,
+                        operator: '$group',
+                        description: 'Regrouper par marque et calculer les accumulateurs',
+                        accumulators: [
+                            'totalStock: { $sum: "$stock" }',
+                            'totalValue: { $sum: { $multiply: ["$price", "$stock"] } }',
+                            'productCount: { $sum: 1 }',
+                            'averagePrice: { $avg: "$price" }'
+                        ]
+                    },
+                    {
+                        stage: 3,
+                        operator: '$sort',
+                        description: 'Trier par valeur totale décroissante'
+                    },
+                    {
+                        stage: 4,
+                        operator: '$project',
+                        description: 'Formater et renommer les champs'
+                    }
+                ],
+                advancedPipeline: [
+                    {
+                        stage: 1,
+                        operator: '$match',
+                        description: 'Filtrer les produits avec tags'
+                    },
+                    {
+                        stage: 2,
+                        operator: '$unwind',
+                        description: 'Décomposer le tableau tags (démonstration)'
+                    },
+                    {
+                        stage: 3,
+                        operator: '$group',
+                        description: 'Regrouper par marque et tag'
+                    }
+                ]
+            },
+            
+            data: {
+                // Résultats de l'exercice 6.3
+                brandAnalysis: brandStats,
+                
+                // Statistiques globales
+                globalStatistics: globalStats,
+                
+                // Analyse avancée (avec $unwind)
+                tagDistribution: tagAnalysis.length > 0 ? {
+                    description: 'Analyse par marque et tag (avec $unwind)',
+                    data: tagAnalysis,
+                    totalTagsAnalyzed: new Set(tagAnalysis.map(item => item.tag)).size
+                } : null,
+                
+                // Market share
+                marketShare: marketShare.length > 0 ? {
+                    topBrands: marketShare,
+                    marketLeader: marketShare[0] || null
+                } : null,
+                
+                // Performance analysis
+                performance: {
+                    mostEfficientBrands: performanceAnalysis.slice(0, 5),
+                    leastEfficientBrands: performanceAnalysis.slice(-5).reverse()
+                }
+            },
+            
+            insights: brandStats.length > 0 ? {
+                totalInventoryValue: globalStats.totalValueAllBrands.toLocaleString('fr-FR', {
+                    style: 'currency',
+                    currency: 'EUR'
+                }),
+                averageBrandValue: (globalStats.totalValueAllBrands / globalStats.totalBrands).toLocaleString('fr-FR', {
+                    style: 'currency',
+                    currency: 'EUR'
+                }),
+                brandConcentration: `${marketShare.length > 0 ? marketShare[0].marketShare : 0}% du marché détenu par la marque leader`,
+                inventoryEfficiency: `Valeur moyenne par unité de stock: ${(globalStats.totalValueAllBrands / globalStats.totalStockAllBrands).toFixed(2)}€`
+            } : null,
+            
+            metadata: {
+                timestamp: new Date().toISOString(),
+                collection: 'products',
+                totalProductsAnalyzed: brandStats.reduce((sum, brand) => sum + brand.productCount, 0),
+                executionTime: Date.now()
+            },
+            
+            // Pour MongoDB Compass
+            mongoDBCompassQuery: {
+                basic: JSON.stringify(basicPipeline, null, 2),
+                advanced: JSON.stringify(advancedPipeline, null, 2)
+            }
+        };
+
+        console.log(`✅ ${brandStats.length} marques analysées`);
+        console.log(`💰 Valeur totale du stock: ${globalStats.totalValueAllBrands.toFixed(2)}€`);
+        console.log(`🏆 Marque leader: ${globalStats.topBrandByValue?.brand || 'Aucune'}`);
+
+        res.json(response);
+
+    } catch (error) {
+        console.error('❌ Erreur dans getBrandAnalysis:', error);
+        
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de l\'analyse des marques',
+            error: process.env.NODE_ENV === 'development' ? {
+                message: error.message,
+                operation: 'aggregation',
+                stack: error.stack
+            } : undefined,
+            exercise: '6.3',
+            timestamp: new Date().toISOString()
+        });
+    }
+}
+
+/**
+ * 🎯 VERSION SPÉCIFIQUE POUR L'EXERCICE 6.3 EXACT
+ * GET /api/products/stats/brands/simple
+ */
+async function getBrandSimpleAnalysis(req, res) {
+    try {
+        const db = getDB();
+        const productsCollection = db.collection('products');
+
+        console.log('🎯 Exercice 6.3 exact - Analyse simple par marque');
+
+        // Pipeline exact de l'exercice 6.3
+        const pipeline = [
+            // Filtrer les produits avec marque
+            {
+                $match: {
+                    brand: { $exists: true, $ne: "" }
+                }
+            },
+            
+            // Regrouper par marque
+            {
+                $group: {
+                    _id: "$brand",
+                    
+                    // Accumulateur 1: Stock total
+                    totalStock: { 
+                        $sum: "$stock" 
+                    },
+                    
+                    // Accumulateur 2: Valeur totale (price * stock)
+                    totalValue: { 
+                        $sum: { 
+                            $multiply: ["$price", "$stock"] 
+                        } 
+                    }
+                }
+            },
+            
+            // Trier par valeur totale
+            {
+                $sort: { 
+                    totalValue: -1 
+                }
+            },
+            
+            // Formater la réponse
+            {
+                $project: {
+                    _id: 0,
+                    brand: "$_id",
+                    totalStock: 1,
+                    totalValue: { 
+                        $round: ["$totalValue", 2] 
+                    }
+                }
+            }
+        ];
+
+        const results = await productsCollection.aggregate(pipeline).toArray();
+
+        // Calculer les totaux
+        const totals = results.reduce((acc, brand) => ({
+            totalStock: acc.totalStock + brand.totalStock,
+            totalValue: acc.totalValue + brand.totalValue
+        }), { totalStock: 0, totalValue: 0 });
+
+        res.json({
+            success: true,
+            exercise: '6.3 - Décomposition par Marque et Prix Total',
+            description: 'Pour chaque marque: stock total et valeur totale du stock (price * stock)',
+            
+            pipeline: [
+                '$group: Regrouper par brand',
+                '  - totalStock: { $sum: "$stock" }',
+                '  - totalValue: { $sum: { $multiply: ["$price", "$stock"] } }',
+                '$sort: Trier par totalValue décroissant',
+                '$project: Formater la réponse'
+            ],
+            
+            data: {
+                brands: results,
+                summary: {
+                    totalBrands: results.length,
+                    totalStockAllBrands: totals.totalStock,
+                    totalValueAllBrands: parseFloat(totals.totalValue.toFixed(2)),
+                    averageStockPerBrand: parseFloat((totals.totalStock / results.length).toFixed(2)),
+                    averageValuePerBrand: parseFloat((totals.totalValue / results.length).toFixed(2))
+                }
+            },
+            
+            // Exemple pour MongoDB Compass
+            mongoDBCompassExample: {
+                stages: [
+                    {
+                        stage: 'Match',
+                        query: '{ brand: { $exists: true, $ne: "" } }'
+                    },
+                    {
+                        stage: 'Group',
+                        query: JSON.stringify({
+                            _id: "$brand",
+                            totalStock: { $sum: "$stock" },
+                            totalValue: { $sum: { $multiply: ["$price", "$stock"] } }
+                        }, null, 2)
+                    }
+                ]
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Erreur dans getBrandSimpleAnalysis:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erreur lors de l\'analyse simple des marques' 
+        });
+    }
+}
 // Exporter les fonctions
 module.exports = {
     getProductStats,
     getCategoryStats,
     getBestRatedProducts,   
     getTopRatedProducts,     
+    getBrandAnalysis,
+    getBrandSimpleAnalysis,
     testAggregationPipeline
 };
