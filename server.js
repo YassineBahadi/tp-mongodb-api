@@ -1,37 +1,32 @@
-// server.js - POINT D'ENTRÉE PRINCIPAL AVEC MONGODB COMPASS
 
 const express = require('express');
 const dotenv = require('dotenv');
 const { connectDB } = require('./src/config/database');
 const productRoutes = require('./src/routes/products');
-const statsRoutes = require('./src/routes/stats'); // <-- Ajouter cette ligne
+const statsRoutes = require('./src/routes/stats'); 
 
 
-// Charger les variables d'environnement
 dotenv.config();
 
-// Initialiser Express
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware de logging
+
 app.use((req, res, next) => {
     console.log(`📨 ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
     next();
 });
 
-// Connexion à MongoDB
 connectDB().catch(console.error);
 
-// Routes API
 app.use('/api/products', productRoutes);
 app.use('/api/products/stats', statsRoutes); 
 
-// Route de test principale
 app.get('/', (req, res) => {
     res.json({ 
         message: '🚀 API de gestion de produits avec MongoDB Compass',

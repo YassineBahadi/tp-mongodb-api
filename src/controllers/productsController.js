@@ -3,10 +3,6 @@
 const { getDB } = require('../config/database');
 const { ObjectId } = require('mongodb');
 
-/**
- * 🛒 RÉCUPÉRER TOUS LES PRODUITS AVEC FILTRES AVANCÉS
- * GET /api/products?page=1&limit=10&category=smartphones&search=iphone&minPrice=100&maxPrice=1000&sort=price&order=desc
- */
 async function getAllProducts(req, res) {
     try {
         const db = getDB();
@@ -28,7 +24,7 @@ async function getAllProducts(req, res) {
             order = 'desc'
         } = req.query;
 
-        console.log('🔍 Paramètres de requête reçus:', req.query);
+        console.log(' Paramètres de requête reçus:', req.query);
 
         // ========== 2. VALIDATION DES PARAMÈTRES ==========
         const pageNumber = Math.max(1, parseInt(page));
@@ -38,22 +34,19 @@ async function getAllProducts(req, res) {
         // ========== 3. CONSTRUCTION DU FILTRE ==========
         let filter = {};
 
-        // 🔸 Filtre par catégorie (insensible à la casse)
         if (category && category.trim() !== '') {
             filter.category = { 
                 $regex: new RegExp(`^${category.trim()}$`, 'i') 
             };
-            console.log(`🎯 Filtre catégorie: ${category}`);
+            console.log(` Filtre catégorie: ${category}`);
         }
 
-        // 🔸 Filtre par marque
         if (brand && brand.trim() !== '') {
             filter.brand = { 
                 $regex: new RegExp(brand.trim(), 'i') 
             };
         }
 
-        // 🔸 Filtre par prix
         if (minPrice || maxPrice) {
             filter.price = {};
             
@@ -62,53 +55,46 @@ async function getAllProducts(req, res) {
             
             if (!isNaN(min) && min >= 0) {
                 filter.price.$gte = min;
-                console.log(`💰 Prix min: ${min}€`);
+                console.log(` Prix min: ${min}€`);
             }
             
             if (!isNaN(max) && max >= 0) {
                 filter.price.$lte = max;
-                console.log(`💰 Prix max: ${max}€`);
+                console.log(` Prix max: ${max}€`);
             }
             
-            // Si seulement max est fourni
             if (filter.price.$gte === undefined && filter.price.$lte !== undefined) {
                 filter.price.$gte = 0;
             }
         }
 
-        // 🔸 Filtre par stock
         if (inStock === 'true') {
             filter.stock = { $gt: 0 };
-            console.log('📦 Seulement produits en stock');
+            console.log(' Seulement produits en stock');
         } else if (inStock === 'false') {
             filter.stock = { $lte: 0 };
-            console.log('📦 Seulement produits épuisés');
+            console.log(' Seulement produits épuisés');
         }
 
-        // 🔸 Filtre par rating
         if (rating) {
             const ratingNum = parseFloat(rating);
             if (!isNaN(ratingNum) && ratingNum >= 0 && ratingNum <= 5) {
                 filter.rating = { $gte: ratingNum };
-                console.log(`⭐ Rating minimum: ${ratingNum}`);
+                console.log(` Rating minimum: ${ratingNum}`);
             }
         }
 
-        // 🔸 Filtre par tags
         if (tags) {
             const tagsArray = Array.isArray(tags) ? tags : [tags];
             filter.tags = { $in: tagsArray.map(tag => new RegExp(tag.trim(), 'i')) };
         }
 
-        // 🔸 Recherche texte avancée
         if (search && search.trim() !== '') {
             const searchTerm = search.trim();
-            console.log(`🔎 Recherche: "${searchTerm}"`);
+            console.log(` Recherche: "${searchTerm}"`);
             
-            // Utiliser l'index de recherche textuelle
             filter.$text = { $search: searchTerm };
             
-            // Alternative: recherche regex si $text échoue
             const searchRegex = new RegExp(searchTerm, 'i');
             filter.$or = [
                 { title: searchRegex },
@@ -119,7 +105,6 @@ async function getAllProducts(req, res) {
             ];
         }
 
-        // ========== 4. CONSTRUCTION DU TRI ==========
         let sortOption = {};
         
         const sortFieldMapping = {
@@ -137,19 +122,17 @@ async function getAllProducts(req, res) {
         const sortField = sortFieldMapping[sort] || 'createdAt';
         sortOption[sortField] = sortOrder;
 
-        console.log(`📊 Tri appliqué: ${sortField} (${sortOrder === 1 ? 'ascendant' : 'descendant'})`);
+        console.log(` Tri appliqué: ${sortField} (${sortOrder === 1 ? 'ascendant' : 'descendant'})`);
 
         // ========== 5. PAGINATION ==========
         const skip = (pageNumber - 1) * limitNumber;
-        console.log(`📄 Pagination: page ${pageNumber}, limit ${limitNumber}, skip ${skip}`);
+        console.log(` Pagination: page ${pageNumber}, limit ${limitNumber}, skip ${skip}`);
 
         // ========== 6. EXÉCUTION DES REQUÊTES ==========
         
-        // 🔹 6.1 Compter le nombre total
         const totalProducts = await productsCollection.countDocuments(filter);
-        console.log(`📈 Total produits correspondants: ${totalProducts}`);
+        console.log(` Total produits correspondants: ${totalProducts}`);
         
-        // 🔹 6.2 Récupérer les produits
         let products = [];
         
         if (totalProducts > 0) {
@@ -161,7 +144,7 @@ async function getAllProducts(req, res) {
                 .toArray();
         }
         
-        console.log(`✅ ${products.length} produits récupérés`);
+        console.log(` ${products.length} produits récupérés`);
 
         // ========== 7. CALCUL DES STATISTIQUES DE LA PAGE ==========
         const totalPages = Math.ceil(totalProducts / limitNumber);
@@ -223,7 +206,7 @@ async function getAllProducts(req, res) {
         res.json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans getAllProducts:', error);
+        console.error(' Erreur dans getAllProducts:', error);
         console.error('Stack:', error.stack);
         
         res.status(500).json({
@@ -244,18 +227,13 @@ async function getAllProducts(req, res) {
     }
 }
 
-/**
- * 📊 STATISTIQUES DES PRODUITS AVANCÉES
- * GET /api/products/stats/summary
- */
 async function getProductStats(req, res) {
     try {
         const db = getDB();
         const productsCollection = db.collection('products');
 
-        console.log('📊 Calcul des statistiques des produits...');
+        console.log(' Calcul des statistiques des produits...');
 
-        // ========== 1. STATISTIQUES GÉNÉRALES ==========
         const generalStatsPipeline = [
             {
                 $group: {
@@ -306,7 +284,6 @@ async function getProductStats(req, res) {
             }
         ];
 
-        // ========== 2. STATISTIQUES PAR CATÉGORIE ==========
         const categoryStatsPipeline = [
             {
                 $group: {
@@ -438,11 +415,11 @@ async function getProductStats(req, res) {
             }
         };
 
-        console.log(`📈 Statistiques calculées: ${generalStats[0]?.totalProducts || 0} produits analysés`);
+        console.log(`Statistiques calculées: ${generalStats[0]?.totalProducts || 0} produits analysés`);
         res.json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans getProductStats:', error);
+        console.error(' Erreur dans getProductStats:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Erreur lors du calcul des statistiques',
@@ -452,17 +429,15 @@ async function getProductStats(req, res) {
     }
 }
 
-/**
- * ➕ CRÉER UN NOUVEAU PRODUIT
- * POST /api/products
- */
+
+
 async function createProduct(req, res) {
     try {
         const db = getDB();
         const productsCollection = db.collection('products');
 
-        console.log('➕ Création d\'un nouveau produit...');
-        console.log('📦 Données reçues:', req.body);
+        console.log(' Création d\'un nouveau produit...');
+        console.log(' Données reçues:', req.body);
 
         // ========== 1. VALIDATION DES DONNÉES ==========
         const requiredFields = ['title', 'price'];
@@ -551,12 +526,12 @@ async function createProduct(req, res) {
             ]
         };
 
-        console.log('✅ Données validées et préparées');
+        console.log(' Données validées et préparées');
 
         // ========== 3. INSERTION DANS LA BASE ==========
         const result = await productsCollection.insertOne(productData);
         
-        console.log(`🎉 Produit créé avec l'ID: ${result.insertedId}`);
+        console.log(` Produit créé avec l'ID: ${result.insertedId}`);
 
         // ========== 4. RÉPONSE ==========
         const response = {
@@ -585,7 +560,7 @@ async function createProduct(req, res) {
         res.status(201).json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans createProduct:', error);
+        console.error(' Erreur dans createProduct:', error);
         
         res.status(500).json({
             success: false,
@@ -605,21 +580,18 @@ async function createProduct(req, res) {
     }
 }
 
-/**
- * 👁️ RÉCUPÉRER UN PRODUIT PAR ID
- * GET /api/products/:id
- */
+
 async function getProductById(req, res) {
     try {
         const db = getDB();
         const productsCollection = db.collection('products');
 
         const productId = req.params.id;
-        console.log(`👁️  Recherche du produit avec ID: ${productId}`);
+        console.log(` Recherche du produit avec ID: ${productId}`);
 
         // ========== 1. VALIDATION DE L'ID ==========
         if (!ObjectId.isValid(productId)) {
-            console.log(`❌ ID invalide: ${productId}`);
+            console.log(` ID invalide: ${productId}`);
             return res.status(400).json({
                 success: false,
                 message: 'Format d\'ID invalide',
@@ -636,7 +608,7 @@ async function getProductById(req, res) {
 
         // ========== 3. VÉRIFICATION SI TROUVÉ ==========
         if (!product) {
-            console.log(`❌ Produit non trouvé: ${productId}`);
+            console.log(` Produit non trouvé: ${productId}`);
             return res.status(404).json({
                 success: false,
                 message: 'Produit non trouvé',
@@ -649,7 +621,7 @@ async function getProductById(req, res) {
             });
         }
 
-        console.log(`✅ Produit trouvé: "${product.title}"`);
+        console.log(` Produit trouvé: "${product.title}"`);
 
         // ========== 4. RÉCUPÉRATION DES PRODUITS SIMILAIRES ==========
         let similarProducts = [];
@@ -692,7 +664,7 @@ async function getProductById(req, res) {
         res.json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans getProductById:', error);
+        console.error(' Erreur dans getProductById:', error);
         
         res.status(500).json({
             success: false,
@@ -707,18 +679,15 @@ async function getProductById(req, res) {
     }
 }
 
-/**
- * ✏️ METTRE À JOUR UN PRODUIT
- * PUT /api/products/:id
- */
+
 async function updateProduct(req, res) {
     try {
         const db = getDB();
         const productsCollection = db.collection('products');
 
         const productId = req.params.id;
-        console.log(`✏️  Mise à jour du produit: ${productId}`);
-        console.log('📝 Données de mise à jour:', req.body);
+        console.log(`  Mise à jour du produit: ${productId}`);
+        console.log(' Données de mise à jour:', req.body);
 
         // ========== 1. VALIDATION DE L'ID ==========
         if (!ObjectId.isValid(productId)) {
@@ -853,11 +822,11 @@ async function updateProduct(req, res) {
             }
         };
 
-        console.log(`✅ Produit mis à jour: ${result.modifiedCount} modification(s)`);
+        console.log(` Produit mis à jour: ${result.modifiedCount} modification(s)`);
         res.json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans updateProduct:', error);
+        console.error(' Erreur dans updateProduct:', error);
         
         res.status(500).json({
             success: false,
@@ -868,17 +837,14 @@ async function updateProduct(req, res) {
     }
 }
 
-/**
- * 🗑️ SUPPRIMER UN PRODUIT
- * DELETE /api/products/:id
- */
+
 async function deleteProduct(req, res) {
     try {
         const db = getDB();
         const productsCollection = db.collection('products');
 
         const productId = req.params.id;
-        console.log(`🗑️  Suppression du produit: ${productId}`);
+        console.log(` Suppression du produit: ${productId}`);
 
         // ========== 1. VALIDATION DE L'ID ==========
         if (!ObjectId.isValid(productId)) {
@@ -927,11 +893,11 @@ async function deleteProduct(req, res) {
             }
         };
 
-        console.log(`✅ Produit supprimé: "${existingProduct.title}"`);
+        console.log(` Produit supprimé: "${existingProduct.title}"`);
         res.json(response);
 
     } catch (error) {
-        console.error('❌ Erreur dans deleteProduct:', error);
+        console.error(' Erreur dans deleteProduct:', error);
         
         res.status(500).json({
             success: false,
@@ -942,10 +908,6 @@ async function deleteProduct(req, res) {
     }
 }
 
-/**
- * 🔍 RECHERCHE AVANCÉE DE PRODUITS
- * GET /api/products/search/advanced
- */
 async function advancedSearch(req, res) {
     try {
         const db = getDB();
@@ -965,7 +927,7 @@ async function advancedSearch(req, res) {
             limit = 20
         } = req.query;
 
-        console.log('🔍 Recherche avancée lancée:', req.query);
+        console.log(' Recherche avancée lancée:', req.query);
 
         // Construction du filtre
         let filter = {};
@@ -1039,7 +1001,7 @@ async function advancedSearch(req, res) {
         });
 
     } catch (error) {
-        console.error('❌ Erreur dans advancedSearch:', error);
+        console.error(' Erreur dans advancedSearch:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Erreur lors de la recherche avancée' 
@@ -1047,10 +1009,7 @@ async function advancedSearch(req, res) {
     }
 }
 
-/**
- * 🏷️ RÉCUPÉRER TOUTES LES CATÉGORIES
- * GET /api/products/categories
- */
+
 async function getAllCategories(req, res) {
     try {
         const db = getDB();
@@ -1078,7 +1037,7 @@ async function getAllCategories(req, res) {
         });
 
     } catch (error) {
-        console.error('❌ Erreur dans getAllCategories:', error);
+        console.error(' Erreur dans getAllCategories:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Erreur lors de la récupération des catégories' 
@@ -1086,7 +1045,6 @@ async function getAllCategories(req, res) {
     }
 }
 
-// Exporter toutes les fonctions
 module.exports = {
     getAllProducts,
     getProductStats,

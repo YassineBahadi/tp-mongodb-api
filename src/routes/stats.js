@@ -1,136 +1,17 @@
-// src/routes/stats.js - ROUTES DES STATISTIQUES AVANCÉES
-
 const express = require('express');
 const router = express.Router();
 const statsController = require('../controllers/statsController');
 
-/**
- * @swagger
- * tags:
- *   name: Statistiques
- *   description: Endpoints d'agrégation avancée pour les statistiques produits
- */
 
-/**
- * @swagger
- * /api/products/stats:
- *   get:
- *     summary: Récupère toutes les statistiques avancées des produits
- *     tags: [Statistiques]
- *     description: |
- *       Cet endpoint exécute plusieurs pipelines d'agrégation MongoDB pour répondre à différentes questions business.
- *       
- *       **Exercices inclus:**
- *       - 6.1: Statistiques globales par catégorie
- *       - 6.2: Distribution des prix par tranche
- *       - 6.3: Top 10 des marques
- *       - 6.4: Analyse des ratings
- *       - 6.5: Tendance des prix par catégorie
- *     responses:
- *       200:
- *         description: Statistiques récupérées avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     categoryStatistics:
- *                       type: object
- *                       description: Statistiques par catégorie (Exercice 6.1)
- *                     priceDistribution:
- *                       type: object
- *                       description: Distribution des prix (Exercice 6.2)
- *                     topBrands:
- *                       type: object
- *                       description: Top 10 des marques (Exercice 6.3)
- *                     ratingAnalysis:
- *                       type: object
- *                       description: Analyse des ratings (Exercice 6.4)
- *                     priceTrends:
- *                       type: object
- *                       description: Tendance des prix (Exercice 6.5)
- *       500:
- *         description: Erreur serveur
- */
 router.get('/', statsController.getProductStats);
 
-/**
- * @swagger
- * /api/products/stats/categories:
- *   get:
- *     summary: Statistiques par catégorie (Exercice 6.1)
- *     tags: [Statistiques]
- *     description: |
- *       **Exercice 6.1: Calcul des Statistiques Globales par Catégorie**
- *       
- *       Pipeline MongoDB:
- *       1. $match - Filtrer les produits avec catégorie
- *       2. $group - Regrouper par catégorie et calculer les statistiques
- *       3. $sort - Trier par prix moyen décroissant
- *       4. $project - Renommer et formater les champs
- *       
- *       Retourne pour chaque catégorie:
- *       - Nombre total de produits
- *       - Prix moyen (μ)
- *       - Prix maximum
- *       - Prix minimum
- *     responses:
- *       200:
- *         description: Statistiques par catégorie récupérées
- *       500:
- *         description: Erreur serveur
- */
+
 router.get('/categories', statsController.getCategoryStats);
 
-/**
- * @swagger
- * /api/products/stats/test:
- *   get:
- *     summary: Tester différents pipelines d'agrégation
- *     tags: [Statistiques]
- *     parameters:
- *       - in: query
- *         name: pipeline
- *         schema:
- *           type: string
- *           enum: [category, price, brand, rating]
- *         required: true
- *         description: Type de pipeline à tester
- *     responses:
- *       200:
- *         description: Résultat du pipeline
- *       400:
- *         description: Pipeline invalide
- *       500:
- *         description: Erreur serveur
- */
+
 router.get('/test', statsController.testAggregationPipeline);
 
-/**
- * @swagger
- * /api/products/stats/summary:
- *   get:
- *     summary: Statistiques sommaires (endpoint existant)
- *     tags: [Statistiques]
- *     description: Endpoint existant pour les statistiques sommaires
- *     responses:
- *       200:
- *         description: Statistiques sommaires récupérées
- *       500:
- *         description: Erreur serveur
- */
-// Note: Cette route est déjà définie dans products.js
-// Elle est mentionnée ici pour la documentation
 
-/**
- * Route pour la documentation des pipelines
- * GET /api/products/stats/docs
- */
 router.get('/docs', (req, res) => {
     res.json({
         title: 'Documentation des Endpoints de Statistiques',
@@ -207,177 +88,14 @@ router.get('/docs', (req, res) => {
     });
 });
 
-// Ajouter ces routes dans src/routes/stats.js
 
-/**
- * @swagger
- * /api/products/stats/best-rated:
- *   get:
- *     summary: Exercice 6.2 - Meilleurs produits par notation
- *     tags: [Statistiques]
- *     description: |
- *       **Exercice 6.2: Recherche des Meilleurs Produits par Notation**
- *       
- *       Pipeline MongoDB:
- *       1. $match - Filtrer les produits avec price > 500 et rating existant
- *       2. $sort - Trier par rating en ordre décroissant
- *       3. $limit - Limiter aux 5 premiers résultats
- *       4. $project - Sélectionner les champs title, price, rating
- *       
- *       Retourne les 5 produits les mieux notés avec un prix > 500€
- *     parameters:
- *       - in: query
- *         name: minPrice
- *         schema:
- *           type: number
- *           default: 500
- *         description: Prix minimum des produits
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 5
- *         description: Nombre de produits à retourner
- *       - in: query
- *         name: order
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: Ordre de tri (desc pour les meilleurs, asc pour les pires)
- *       - in: query
- *         name: includeWorst
- *         schema:
- *           type: boolean
- *           default: false
- *         description: Inclure aussi les pires produits
- *     responses:
- *       200:
- *         description: Liste des meilleurs produits
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 exercise:
- *                   type: string
- *                 pipelineStages:
- *                   type: array
- *                 data:
- *                   type: object
- *                   properties:
- *                     bestProducts:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           title:
- *                             type: string
- *                           price:
- *                             type: number
- *                           rating:
- *                             type: number
- *       500:
- *         description: Erreur serveur
- */
-router.get('/best-rated', statsController.getBestRatedProducts);
-
-/**
- * @swagger
- * /api/products/stats/top-rated:
- *   get:
- *     summary: Produits les mieux notés (version avancée)
- *     tags: [Statistiques]
- *     parameters:
- *       - in: query
- *         name: minPrice
- *         schema:
- *           type: number
- *         description: Prix minimum
- *       - in: query
- *         name: minRating
- *         schema:
- *           type: number
- *           default: 4
- *         description: Rating minimum
- *       - in: query
- *         name: category
- *         schema:
- *           type: string
- *         description: Filtrer par catégorie
- *     responses:
- *       200:
- *         description: Produits top-rated
- */
 router.get('/top-rated', statsController.getTopRatedProducts);
 
 
-/**
- * @swagger
- * /api/products/stats/brand-analysis:
- *   get:
- *     summary: Exercice 6.3 - Analyse complète par marque
- *     tags: [Statistiques]
- *     description: |
- *       **Exercice 6.3: Décomposition par Marque et Prix Total**
- *       
- *       Pipeline MongoDB:
- *       1. $match - Filtrer les produits avec marque définie
- *       2. $group - Regrouper par marque et calculer:
- *          - totalStock: { $sum: "$stock" }
- *          - totalValue: { $sum: { $multiply: ["$price", "$stock"] } }
- *          - productCount: { $sum: 1 }
- *          - averagePrice: { $avg: "$price" }
- *       3. $sort - Trier par valeur totale décroissante
- *       4. $project - Formater et renommer les champs
- *       
- *       Inclut également une démonstration de $unwind avec les tags
- *     responses:
- *       200:
- *         description: Analyse des marques complète
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 exercise:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     brandAnalysis:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           brand:
- *                             type: string
- *                           totalStock:
- *                             type: number
- *                           totalValue:
- *                             type: number
- *                           productCount:
- *                             type: number
- *       500:
- *         description: Erreur serveur
- */
+
 router.get('/brand-analysis', statsController.getBrandAnalysis);
 
-/**
- * @swagger
- * /api/products/stats/brands/simple:
- *   get:
- *     summary: Exercice 6.3 exact - Analyse simple par marque
- *     tags: [Statistiques]
- *     description: Version simplifiée de l'exercice 6.3
- *     responses:
- *       200:
- *         description: Analyse simple des marques
- */
+
 router.get('/brands/simple', statsController.getBrandSimpleAnalysis);
 
 module.exports = router;

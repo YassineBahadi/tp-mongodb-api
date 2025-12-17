@@ -1,21 +1,18 @@
-// seedProducts.js - PEUPLEMENT DES DONNÉES POUR MONGODB COMPASS
 
 const { MongoClient } = require('mongodb');
-const axios = require('axios'); // Pour faire des requêtes HTTP
+const axios = require('axios'); 
 require('dotenv').config();
 
-// 2. FONCTION PRINCIPALE
 async function seedProducts() {
     console.log('='.repeat(60));
-    console.log('🌱 DÉMARRAGE DU SEEDING POUR MONGODB COMPASS');
+    console.log(' DÉMARRAGE DU SEEDING POUR MONGODB COMPASS');
     console.log('='.repeat(60));
     
-    // Chaîne de connexion MongoDB (pour MongoDB Compass)
     const uri = process.env.DB_STRING || 'mongodb://localhost:27017';
     const dbName = process.env.DB_NAME || 'produitsDB';
     
-    console.log(`🔗 Connexion à: ${uri}`);
-    console.log(`📁 Base de données: ${dbName}`);
+    console.log(` Connexion à: ${uri}`);
+    console.log(` Base de données: ${dbName}`);
     
     const client = new MongoClient(uri, {
         maxPoolSize: 10,
@@ -25,38 +22,38 @@ async function seedProducts() {
     
     try {
         // 3. CONNEXION À MONGODB
-        console.log('\n🔄 Connexion à MongoDB...');
+        console.log('\n Connexion à MongoDB...');
         await client.connect();
-        console.log('✅ Connexion à MongoDB établie');
+        console.log(' Connexion à MongoDB établie');
         
         // Vérification de la connexion
         await client.db().admin().ping();
-        console.log('📡 Ping MongoDB réussi');
+        console.log(' Ping MongoDB réussi');
         
         const db = client.db(dbName);
         const collection = db.collection('products');
         
         // 4. VÉRIFIER LA COLLECTION
-        console.log('\n🔍 Vérification de la collection...');
+        console.log('\n Vérification de la collection...');
         const collections = await db.listCollections().toArray();
         const collectionExists = collections.some(col => col.name === 'products');
         
         if (!collectionExists) {
-            console.log('📦 Création de la collection "products"...');
+            console.log(' Création de la collection "products"...');
             await db.createCollection('products');
-            console.log('✅ Collection créée');
+            console.log(' Collection créée');
         } else {
-            console.log('✅ Collection "products" trouvée');
+            console.log(' Collection "products" trouvée');
         }
         
         // 5. SUPPRIMER LES ANCIENS PRODUITS (pour un seed propre)
-        console.log('\n🧹 Nettoyage des anciens produits...');
+        console.log('\n Nettoyage des anciens produits...');
         const deleteResult = await collection.deleteMany({});
-        console.log(`✅ ${deleteResult.deletedCount} anciens produits supprimés`);
+        console.log(` ${deleteResult.deletedCount} anciens produits supprimés`);
         
         // 6. RÉCUPÉRER LES DONNÉES DEPUIS L'API EXTERNE
-        console.log('\n📡 Récupération des produits depuis dummyjson.com...');
-        console.log('⏳ Cette opération peut prendre quelques secondes...');
+        console.log('\n Récupération des produits depuis dummyjson.com...');
+        console.log(' Cette opération peut prendre quelques secondes...');
         
         try {
             const response = await axios.get('https://dummyjson.com/products?limit=100', {
@@ -65,11 +62,11 @@ async function seedProducts() {
             
             const products = response.data.products; // Tableau de produits
         
-            console.log(`📦 ${products.length} produits récupérés avec succès`);
+            console.log(` ${products.length} produits récupérés avec succès`);
             
             // 7. INSÉRER LES NOUVEAUX PRODUITS
             if (products.length > 0) {
-                console.log('\n💾 Transformation et insertion des données...');
+                console.log('\n Transformation et insertion des données...');
                 
                 // Transformer les données pour notre besoin
                 const productsToInsert = products.map(product => {
@@ -126,11 +123,11 @@ async function seedProducts() {
                     };
                 });
                 
-                console.log(`🔧 ${productsToInsert.length} produits préparés pour l'insertion`);
-                console.log('⏳ Insertion en cours...');
+                console.log(` ${productsToInsert.length} produits préparés pour l'insertion`);
+                console.log(' Insertion en cours...');
                 
                 const result = await collection.insertMany(productsToInsert);
-                console.log(`🎉 ${result.insertedCount} produits insérés avec succès !`);
+                console.log(` ${result.insertedCount} produits insérés avec succès !`);
                 
                 // 8. CRÉER LES INDEXES POUR AMÉLIORER LES PERFORMANCES
                 console.log('\n⚡ Création des indexes pour MongoDB Compass...');
@@ -157,10 +154,10 @@ async function seedProducts() {
                             }
                         }
                     );
-                    console.log('✅ Index de recherche textuelle créé');
+                    console.log(' Index de recherche textuelle créé');
                 } catch (indexError) {
                     if (!indexError.message.includes('already exists')) {
-                        console.log('⚠️  Index de recherche textuelle déjà existant');
+                        console.log('  Index de recherche textuelle déjà existant');
                     }
                 }
                 
@@ -179,46 +176,46 @@ async function seedProducts() {
                     try {
                         const fieldName = Object.keys(indexSpec)[0];
                         await collection.createIndex(indexSpec);
-                        console.log(`✅ Index créé: ${fieldName}`);
+                        console.log(` Index créé: ${fieldName}`);
                     } catch (error) {
                         // Ignorer les indexes qui existent déjà
                         if (!error.message.includes('already exists')) {
-                            console.warn(`⚠️  Erreur avec l'index: ${error.message}`);
+                            console.warn(`  Erreur avec l'index: ${error.message}`);
                         }
                     }
                 }
                 
-                console.log('📈 Tous les indexes créés avec succès');
+                console.log(' Tous les indexes créés avec succès');
                 
                 // 9. VÉRIFICATION ET STATISTIQUES
-                console.log('\n📊 VÉRIFICATION FINALE');
+                console.log('\n VÉRIFICATION FINALE');
                 console.log('-'.repeat(40));
                 
                 // Compter le nombre total
                 const totalCount = await collection.countDocuments();
-                console.log(`📦 Total produits: ${totalCount}`);
+                console.log(` Total produits: ${totalCount}`);
                 
                 // Statistiques par catégorie
                 const categories = await collection.distinct('category');
-                console.log(`🏷️  Catégories uniques: ${categories.length}`);
+                console.log(`  Catégories uniques: ${categories.length}`);
                 
                 // Statistiques par marque
                 const brands = await collection.distinct('brand');
-                console.log(`🏭 Marques uniques: ${brands.length}`);
+                console.log(` Marques uniques: ${brands.length}`);
                 
                 // Prix moyen
                 const avgPriceResult = await collection.aggregate([
                     { $group: { _id: null, avgPrice: { $avg: "$price" } } }
                 ]).toArray();
                 const avgPrice = avgPriceResult[0]?.avgPrice || 0;
-                console.log(`💰 Prix moyen: ${avgPrice.toFixed(2)}€`);
+                console.log(` Prix moyen: ${avgPrice.toFixed(2)}€`);
                 
                 // Produits en promotion
                 const discountCount = await collection.countDocuments({ hasDiscount: true });
-                console.log(`🎯 Produits en promotion: ${discountCount}`);
+                console.log(` Produits en promotion: ${discountCount}`);
                 
                 // 10. AFFICHER QUELQUES EXEMPLES
-                console.log('\n📝 EXEMPLES DE PRODUITS INSÉRÉS:');
+                console.log('\n EXEMPLES DE PRODUITS INSÉRÉS:');
                 console.log('-'.repeat(40));
                 
                 const sampleProducts = await collection
@@ -228,29 +225,29 @@ async function seedProducts() {
                 
                 sampleProducts.forEach((product, index) => {
                     const discountInfo = product.hasDiscount 
-                        ? `🔴 -${product.discountPercentage}% (${product.discountedPrice}€)`
+                        ? ` -${product.discountPercentage}% (${product.discountedPrice}€)`
                         : '';
                     
                     console.log(`${index + 1}. ${product.title}`);
-                    console.log(`   💰 Prix: ${product.price}€ ${discountInfo}`);
-                    console.log(`   🏷️  Catégorie: ${product.category}`);
-                    console.log(`   ⭐ Note: ${product.rating}/5`);
-                    console.log(`   📦 Stock: ${product.stock} unités`);
-                    console.log(`   🏭 Marque: ${product.brand}`);
+                    console.log(`    Prix: ${product.price}€ ${discountInfo}`);
+                    console.log(`     Catégorie: ${product.category}`);
+                    console.log(`    Note: ${product.rating}/5`);
+                    console.log(`    Stock: ${product.stock} unités`);
+                    console.log(`    Marque: ${product.brand}`);
                     console.log('');
                 });
                 
                 // 11. INSTRUCTIONS POUR MONGODB COMPASS
-                console.log('\n🔧 INSTRUCTIONS POUR MONGODB COMPASS:');
+                console.log('\n INSTRUCTIONS POUR MONGODB COMPASS:');
                 console.log('='.repeat(60));
-                console.log('1. 📊 Ouvrir MongoDB Compass');
-                console.log(`2. 🔌 Se connecter à: ${uri}`);
-                console.log(`3. 📁 Sélectionner la base: ${dbName}`);
-                console.log('4. 📋 Cliquer sur la collection "products"');
-                console.log('5. 👁️  Vérifier les données insérées');
-                console.log('6. 🔍 Utiliser les filtres et la recherche');
+                console.log('1.  Ouvrir MongoDB Compass');
+                console.log(`2.  Se connecter à: ${uri}`);
+                console.log(`3.  Sélectionner la base: ${dbName}`);
+                console.log('4.  Cliquer sur la collection "products"');
+                console.log('5.   Vérifier les données insérées');
+                console.log('6.  Utiliser les filtres et la recherche');
                 console.log('');
-                console.log('🎯 FILTRES DISPONIBLES DANS MONGODB COMPASS:');
+                console.log(' FILTRES DISPONIBLES DANS MONGODB COMPASS:');
                 console.log('   • category: "smartphones", "laptops", etc.');
                 console.log('   • price: { $gte: 100, $lte: 1000 }');
                 console.log('   • rating: { $gte: 4 }');
@@ -259,12 +256,12 @@ async function seedProducts() {
                 console.log('='.repeat(60));
                 
             } else {
-                console.warn('⚠️  Aucun produit récupéré de l\'API');
+                console.warn('  Aucun produit récupéré de l\'API');
             }
             
         } catch (apiError) {
-            console.error('❌ Erreur lors de la récupération des données API:', apiError.message);
-            console.log('\n💡 SOLUTION DE SECOURS: Insertion de données de test locales');
+            console.error(' Erreur lors de la récupération des données API:', apiError.message);
+            console.log('\n SOLUTION DE SECOURS: Insertion de données de test locales');
             
             // Données de secours
             const backupProducts = [
@@ -321,20 +318,20 @@ async function seedProducts() {
             }));
             
             const backupResult = await collection.insertMany(backupToInsert);
-            console.log(`✅ ${backupResult.insertedCount} produits de secours insérés`);
+            console.log(` ${backupResult.insertedCount} produits de secours insérés`);
         }
         
     } catch (error) {
-        console.error('\n❌ ERREUR CRITIQUE LORS DU SEEDING:');
+        console.error('\n ERREUR CRITIQUE LORS DU SEEDING:');
         console.error('Message:', error.message);
-        console.error('\n🔍 DÉPANNAGE MONGODB COMPASS:');
+        console.error('\n DÉPANNAGE MONGODB COMPASS:');
         console.log('1. Vérifiez que MongoDB est en cours d\'exécution');
         console.log('2. Ouvrez MongoDB Compass et testez la connexion');
         console.log(`3. Vérifiez l\'URI: ${uri}`);
         console.log('4. Assurez-vous d\'avoir les permissions nécessaires');
         
         if (error.code === 'ECONNREFUSED') {
-            console.log('\n🚨 MONGODB N\'EST PAS DÉMARRÉ');
+            console.log('\n MONGODB N\'EST PAS DÉMARRÉ');
             console.log('Windows: Vérifiez le service "MongoDB"');
             console.log('Mac: brew services start mongodb-community');
             console.log('Linux: sudo systemctl start mongod');
@@ -343,16 +340,16 @@ async function seedProducts() {
     } finally {
         // Fermer la connexion
         await client.close();
-        console.log('\n🔌 Connexion à MongoDB fermée.');
-        console.log('\n✨ PROCESSUS DE SEEDING TERMINÉ');
+        console.log('\n Connexion à MongoDB fermée.');
+        console.log('\n PROCESSUS DE SEEDING TERMINÉ');
         console.log('='.repeat(60));
         
         // Instructions finales
-        console.log('\n🚀 POUR DÉMARRER VOTRE API:');
+        console.log('\n POUR DÉMARRER VOTRE API:');
         console.log('   npm run dev');
-        console.log('\n🌐 POUR TESTER VOTRE API:');
+        console.log('\n POUR TESTER VOTRE API:');
         console.log('   http://localhost:3000/api/products');
-        console.log('\n🔧 POUR VÉRIFIER DANS MONGODB COMPASS:');
+        console.log('\n POUR VÉRIFIER DANS MONGODB COMPASS:');
         console.log(`   Base: ${dbName}, Collection: products`);
     }
 }
